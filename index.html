@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f0f0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="L1 Daily">
+<link rel="manifest" href="manifest.json">
+<title>L1 Daily Entry</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f0f0e;
+  --surface:#1a1a18;
+  --surface2:#232320;
+  --border:#2e2e2a;
+  --border2:#3a3a35;
+  --text:#f0efe8;
+  --muted:#888880;
+  --hint:#555550;
+  --green:#4a9e5c;
+  --green-bg:#1a2e1e;
+  --green-dim:#2a4a30;
+  --amber:#d4943a;
+  --amber-bg:#2a1e0e;
+  --blue:#4a8fd4;
+  --blue-bg:#101e2e;
+  --red:#d44a4a;
+  --red-bg:#2e1010;
+  --accent:#e8d5a0;
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{background:var(--bg);height:100%;}
+body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);min-height:100%;padding-bottom:100px;}
+
+/* TOP BAR */
+.topbar{
+  position:sticky;top:0;z-index:200;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  padding:14px 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.topbar-left{}
+.app-name{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--accent);letter-spacing:-0.5px;}
+.app-sub{font-size:10px;color:var(--muted);margin-top:1px;letter-spacing:0.05em;}
+.topbar-date{text-align:right;}
+.date-big{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--text);}
+.date-small{font-size:10px;color:var(--muted);margin-top:1px;}
+
+/* SECTION TABS */
+.section-tabs{
+  display:flex;gap:0;padding:0 16px;margin:16px 0 0;
+  border-bottom:1px solid var(--border);
+}
+.stab{
+  flex:1;padding:10px 4px;font-size:11px;font-weight:500;letter-spacing:0.04em;
+  text-transform:uppercase;color:var(--hint);
+  border:none;background:transparent;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all 0.15s;
+  font-family:'DM Mono',monospace;
+}
+.stab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* SECTIONS */
+.section{display:none;padding:16px;}
+.section.active{display:block;}
+
+/* CARDS */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px;margin-bottom:12px;
+}
+.card-title{
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:12px;
+}
+
+/* PAYMENT GRID */
+.pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.pm-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;}
+.pm-label{font-size:10px;color:var(--muted);letter-spacing:0.05em;margin-bottom:6px;}
+.pm-input-wrap{position:relative;}
+.pm-input{
+  width:100%;background:transparent;border:none;
+  font-family:'DM Mono',monospace;font-size:15px;font-weight:500;
+  color:var(--text);padding:0;outline:none;
+  -webkit-appearance:none;
+}
+.pm-input::placeholder{color:var(--hint);}
+.pm-limit{font-size:9px;color:var(--hint);margin-top:4px;}
+.pm-over{border-color:var(--red)!important;background:var(--red-bg)!important;}
+.pm-warn{border-color:var(--amber)!important;}
+
+/* TRANSFERS */
+.tx-list{display:flex;flex-direction:column;gap:8px;}
+.tx-item{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:10px;
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;
+  position:relative;
+}
+.tx-item.in-type{border-left:3px solid var(--green);}
+.tx-item.out-type{border-left:3px solid var(--red);}
+.tx-field{}
+.tx-field-label{font-size:9px;color:var(--muted);letter-spacing:0.05em;margin-bottom:4px;}
+.tx-select,.tx-input{
+  width:100%;background:var(--surface);border:1px solid var(--border2);
+  border-radius:6px;padding:6px 8px;
+  font-family:'DM Mono',monospace;font-size:12px;color:var(--text);outline:none;
+  -webkit-appearance:none;appearance:none;
+}
+.tx-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888880'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;}
+.tx-del{
+  position:absolute;top:8px;right:8px;
+  width:20px;height:20px;border-radius:50%;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  line-height:1;
+}
+.tx-del:active{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+.tx-add-row{display:flex;gap:8px;margin-top:4px;}
+.tx-add-btn{
+  flex:1;padding:10px;border-radius:8px;border:1px dashed var(--border2);
+  background:transparent;color:var(--muted);font-size:11px;
+  font-family:'DM Mono',monospace;cursor:pointer;letter-spacing:0.04em;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.tx-add-btn:active{background:var(--surface2);}
+.dot-in{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.dot-out{width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;}
+
+/* BALANCE PREVIEW */
+.bal-grid{display:flex;flex-direction:column;gap:6px;}
+.bal-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 10px;background:var(--surface2);border-radius:6px;
+  font-size:12px;
+}
+.bal-pm{color:var(--muted);}
+.bal-net{font-weight:500;}
+.bal-pos{color:var(--green);}
+.bal-neg{color:var(--red);}
+.bal-zero{color:var(--hint);}
+.bal-total{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;background:var(--surface);
+  border:1px solid var(--border2);border-radius:8px;
+  margin-top:4px;
+}
+.bal-total-label{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--muted);}
+.bal-total-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;}
+
+/* NOTE */
+.note-input{
+  width:100%;background:transparent;border:none;
+  font-family:'DM Mono',monospace;font-size:13px;color:var(--text);
+  resize:none;outline:none;min-height:60px;line-height:1.6;
+}
+.note-input::placeholder{color:var(--hint);}
+
+/* SUBMIT */
+.submit-area{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:12px 16px 24px;background:var(--bg);
+  border-top:1px solid var(--border);z-index:100;
+}
+.submit-btn{
+  width:100%;padding:16px;border-radius:var(--r);border:none;cursor:pointer;
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:800;
+  letter-spacing:0.05em;text-transform:uppercase;
+  background:var(--accent);color:var(--bg);
+  transition:opacity 0.15s,transform 0.1s;
+}
+.submit-btn:active{opacity:0.85;transform:scale(0.99);}
+.submit-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* HISTORY */
+.hist-list{display:flex;flex-direction:column;gap:8px;}
+.hist-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;cursor:pointer;
+}
+.hist-card:active{background:var(--surface2);}
+.hist-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.hist-date{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+.hist-net{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;}
+.hist-pms{display:flex;gap:6px;flex-wrap:wrap;}
+.hist-pm-chip{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--muted);}
+.hist-note{font-size:11px;color:var(--hint);margin-top:6px;font-style:italic;}
+.empty-state{text-align:center;padding:48px 16px;color:var(--hint);}
+.empty-icon{font-size:32px;margin-bottom:12px;}
+.empty-text{font-size:13px;line-height:1.6;}
+
+/* TOAST */
+.toast{
+  position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);
+  background:var(--green);color:#fff;padding:10px 20px;border-radius:30px;
+  font-size:12px;font-family:'DM Mono',monospace;font-weight:500;
+  opacity:0;transition:all 0.25s;z-index:999;white-space:nowrap;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* DETAIL MODAL */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;
+  display:flex;align-items:flex-end;
+  opacity:0;pointer-events:none;transition:opacity 0.2s;
+}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{
+  width:100%;background:var(--surface);border-radius:16px 16px 0 0;
+  padding:20px 16px 40px;max-height:80vh;overflow-y:auto;
+  transform:translateY(40px);transition:transform 0.25s;
+}
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px;}
+.modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;margin-bottom:14px;}
+.modal-table{width:100%;border-collapse:collapse;font-size:12px;}
+.modal-table td{padding:6px 0;border-bottom:1px solid var(--border);}
+.modal-table td:last-child{text-align:right;color:var(--text);}
+.modal-table td:first-child{color:var(--muted);}
+.modal-table tr:last-child td{border-bottom:none;}
+.modal-close{
+  width:100%;margin-top:14px;padding:12px;border-radius:8px;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:13px;cursor:pointer;
+}
+
+/* EXPORT BTN */
+.export-btn{
+  width:100%;padding:10px;border-radius:8px;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;
+  cursor:pointer;margin-top:8px;letter-spacing:0.04em;
+}
+.export-btn:active{background:var(--surface2);}
+
+/* SECTION INDICATOR */
+.section-indicator{
+  display:flex;gap:4px;justify-content:center;margin:8px 0 0;
+}
+.si-dot{width:6px;height:6px;border-radius:50%;background:var(--border2);transition:background 0.2s;}
+.si-dot.active{background:var(--accent);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="app-name">L1 · Daily</div>
+    <div class="app-sub">Cashier L1 · 7:00 AM – 11:00 AM</div>
+  </div>
+  <div class="topbar-date">
+    <div class="date-big" id="dateBig"></div>
+    <div class="date-small" id="dateSub"></div>
+  </div>
+</div>
+
+<div class="section-tabs">
+  <button class="stab active" onclick="switchSection(0)">Open</button>
+  <button class="stab" onclick="switchSection(1)">Transfers</button>
+  <button class="stab" onclick="switchSection(2)">Close</button>
+  <button class="stab" onclick="switchSection(3)">History</button>
+</div>
+<div class="section-indicator">
+  <div class="si-dot active"></div>
+  <div class="si-dot"></div>
+  <div class="si-dot"></div>
+  <div class="si-dot"></div>
+</div>
+
+<!-- SECTION 0: OPEN -->
+<div class="section active" id="sec0">
+  <div class="card">
+    <div class="card-title">Opening Balance</div>
+    <div class="pm-grid" id="openGrid"></div>
+  </div>
+</div>
+
+<!-- SECTION 1: TRANSFERS -->
+<div class="section" id="sec1">
+  <div class="card">
+    <div class="card-title">Other In / Out</div>
+    <div class="tx-list" id="txList"></div>
+    <div class="tx-add-row" style="margin-top:10px;">
+      <button class="tx-add-btn" onclick="addTx('in')"><div class="dot-in"></div>ငွေဝင် IN</button>
+      <button class="tx-add-btn" onclick="addTx('out')"><div class="dot-out"></div>ငွေထွက် OUT</button>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2: CLOSE + PREVIEW -->
+<div class="section" id="sec2">
+  <div class="card">
+    <div class="card-title">Closing Balance</div>
+    <div class="pm-grid" id="closeGrid"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Balance Preview</div>
+    <div class="bal-grid" id="balPreview"></div>
+    <div class="bal-total" id="balTotal">
+      <span class="bal-total-label">Net</span>
+      <span class="bal-total-val bal-zero" id="balTotalVal">—</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">မှတ်ချက်</div>
+    <textarea class="note-input" id="noteInput" placeholder="မှတ်ချက် ထည့်ပါ…" rows="3"></textarea>
+  </div>
+</div>
+
+<!-- SECTION 3: HISTORY -->
+<div class="section" id="sec3">
+  <div style="margin-bottom:8px;display:flex;justify-content:flex-end;">
+    <button class="export-btn" onclick="exportCSV()">Export CSV ↓</button>
+  </div>
+  <div class="hist-list" id="histList"></div>
+</div>
+
+<!-- SUBMIT (hidden on history tab) -->
+<div class="submit-area" id="submitArea">
+  <button class="submit-btn" id="submitBtn" onclick="submitEntry()">Submit Today's Entry</button>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle"></div>
+    <div id="modalBody"></div>
+    <button class="modal-close" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+const PAYMENTS=[
+  {id:'kpay1', label:'KPay 1',  limit:2000000},
+  {id:'kpay2', label:'KPay 2',  limit:2000000},
+  {id:'wave1', label:'Wave 1',  limit:1000000},
+  {id:'wave2', label:'Wave 2',  limit:1000000},
+  {id:'banking',label:'Banking',limit:5000000},
+  {id:'one',   label:'One',     limit:null},
+  {id:'trident',label:'Trident',limit:null},
+];
+const PM_OPTS = PAYMENTS.map(p=>`<option value="${p.id}">${p.label}</option>`).join('');
+const TYPE_OPTS = ['cashier-L2','cashier-L3','cashier-L4','external','master','other']
+  .map(v=>`<option value="${v}">${
+    v==='cashier-L2'?'Cashier L2':v==='cashier-L3'?'Cashier L3':
+    v==='cashier-L4'?'Cashier L4':v==='external'?'ပြင်ပ':
+    v==='master'?'Master Agent':'အခြား'
+  }</option>`).join('');
+
+const fmt = n => Math.abs(Math.round(n)).toLocaleString();
+
+let txItems = [];
+let currentSection = 0;
+
+// ── Date ────────────────────────────────────────────────────────────────
+const now = new Date();
+const TODAY_KEY = now.toISOString().slice(0,10);
+const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+document.getElementById('dateBig').textContent =
+  now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+document.getElementById('dateSub').textContent = days[now.getDay()];
+
+// ── Build payment grids ──────────────────────────────────────────────────
+function buildPmGrid(containerId, phase) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = PAYMENTS.map(p=>`
+    <div class="pm-item" id="${phase}_block_${p.id}">
+      <div class="pm-label">${p.label}</div>
+      <div class="pm-input-wrap">
+        <input class="pm-input" type="number" inputmode="numeric"
+          id="${phase}_${p.id}" placeholder="0"
+          oninput="onPmInput('${phase}','${p.id}')">
+      </div>
+      ${p.limit?`<div class="pm-limit">max ${fmt(p.limit)} ks</div>`:'<div class="pm-limit">—</div>'}
+    </div>
+  `).join('');
+}
+buildPmGrid('openGrid','open');
+buildPmGrid('closeGrid','close');
+
+function onPmInput(phase, pid) {
+  const pm = PAYMENTS.find(p=>p.id===pid);
+  const val = parseFloat(document.getElementById(`${phase}_${pid}`).value)||0;
+  const block = document.getElementById(`${phase}_block_${pid}`);
+  block.classList.remove('pm-over','pm-warn');
+  if(pm.limit) {
+    if(val > pm.limit) block.classList.add('pm-over');
+    else if(val > pm.limit*0.85) block.classList.add('pm-warn');
+  }
+  if(phase==='close') updatePreview();
+}
+
+// ── Transfers ────────────────────────────────────────────────────────────
+function addTx(dir) {
+  const id = Date.now();
+  txItems.push({id, dir, from_to:'external', payment:'kpay1', amount:''});
+  renderTxList();
+}
+function delTx(id) {
+  txItems = txItems.filter(t=>t.id!==id);
+  renderTxList();
+}
+function updateTx(id, field, val) {
+  const t = txItems.find(t=>t.id===id);
+  if(t) t[field]=val;
+  updatePreview();
+}
+function renderTxList() {
+  const el = document.getElementById('txList');
+  if(!txItems.length) {
+    el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--hint);font-size:12px;">ငွေလွှဲမှတ်တမ်း မရှိသေးပါ</div>`;
+    return;
+  }
+  el.innerHTML = txItems.map(tx=>`
+    <div class="tx-item ${tx.dir}-type">
+      <button class="tx-del" onclick="delTx(${tx.id})">×</button>
+      <div class="tx-field">
+        <div class="tx-field-label">${tx.dir==='in'?'ရရာနေရာ':'ပေးရာနေရာ'}</div>
+        <select class="tx-select" onchange="updateTx(${tx.id},'from_to',this.value)">
+          ${TYPE_OPTS.replace(`value="${tx.from_to}"`,`value="${tx.from_to}" selected`)}
+        </select>
+      </div>
+      <div class="tx-field">
+        <div class="tx-field-label">Payment</div>
+        <select class="tx-select" onchange="updateTx(${tx.id},'payment',this.value)">
+          ${PM_OPTS.replace(`value="${tx.payment}"`,`value="${tx.payment}" selected`)}
+        </select>
+      </div>
+      <div class="tx-field" style="grid-column:span 2;">
+        <div class="tx-field-label">ပမာဏ (ks)</div>
+        <input class="tx-input" type="number" inputmode="numeric"
+          placeholder="0" value="${tx.amount}"
+          oninput="updateTx(${tx.id},'amount',this.value)">
+      </div>
+      <div class="tx-field" style="grid-column:span 2;">
+        <div class="tx-field-label">မှတ်ချက် (optional)</div>
+        <input class="tx-input" type="text" placeholder="…"
+          value="${tx.note||''}"
+          oninput="updateTx(${tx.id},'note',this.value)">
+      </div>
+    </div>
+  `).join('');
+}
+renderTxList();
+
+// ── Balance preview ───────────────────────────────────────────────────────
+function getVal(id) { return parseFloat(document.getElementById(id)?.value)||0; }
+function updatePreview() {
+  const prev = document.getElementById('balPreview');
+  const totVal = document.getElementById('balTotalVal');
+  let totalNet = 0;
+  prev.innerHTML = PAYMENTS.map(p=>{
+    const o = getVal(`open_${p.id}`);
+    const c = getVal(`close_${p.id}`);
+    const diff = c - o;
+    totalNet += diff;
+    const cls = diff>0?'bal-pos':diff<0?'bal-neg':'bal-zero';
+    const sign = diff>0?'+':diff<0?'-':'';
+    return `<div class="bal-row">
+      <span class="bal-pm">${p.label}</span>
+      <span class="bal-net ${cls}">${diff!==0?sign+fmt(diff)+' ks':'—'}</span>
+    </div>`;
+  }).join('');
+  const tCls = totalNet>0?'bal-pos':totalNet<0?'bal-neg':'bal-zero';
+  totVal.className = `bal-total-val ${tCls}`;
+  totVal.textContent = (totalNet>0?'+':totalNet<0?'-':'') +
+    (totalNet!==0?fmt(totalNet)+' ks':'—');
+}
+
+// ── Section switch ────────────────────────────────────────────────────────
+function switchSection(idx) {
+  currentSection = idx;
+  document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.section').forEach((s,i)=>s.classList.toggle('active',i===idx));
+  document.querySelectorAll('.si-dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
+  document.getElementById('submitArea').style.display = idx===3?'none':'block';
+  if(idx===2) updatePreview();
+  if(idx===3) renderHistory();
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────
+function submitEntry() {
+  const btn = document.getElementById('submitBtn');
+  const open={}, close={};
+  PAYMENTS.forEach(p=>{
+    open[p.id] = getVal(`open_${p.id}`);
+    close[p.id] = getVal(`close_${p.id}`);
+  });
+  const txNet = txItems.reduce((s,tx)=>{
+    const a=parseFloat(tx.amount)||0;
+    return s+(tx.dir==='in'?a:-a);
+  },0);
+  const openTotal = Object.values(open).reduce((a,b)=>a+b,0);
+  const closeTotal = Object.values(close).reduce((a,b)=>a+b,0);
+  const net = closeTotal - openTotal;
+  const note = document.getElementById('noteInput').value;
+
+  const entry = {
+    date: TODAY_KEY,
+    dateLabel: now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
+    dayName: days[now.getDay()],
+    open, close,
+    transfers: txItems.map(t=>({...t})),
+    txNet, openTotal, closeTotal, net, note,
+    savedAt: new Date().toISOString()
+  };
+
+  const log = getLog();
+  const existIdx = log.findIndex(e=>e.date===TODAY_KEY);
+  if(existIdx>=0) log[existIdx]=entry; else log.unshift(entry);
+  setLog(log);
+
+  showToast('Saved · ' + entry.dateLabel);
+  btn.textContent = 'Saved!';
+  btn.style.background = '#4a9e5c';
+  btn.style.color = '#fff';
+  setTimeout(()=>{
+    btn.textContent = 'Submit Today\'s Entry';
+    btn.style.background = '';
+    btn.style.color = '';
+  }, 2000);
+}
+
+// ── Storage ───────────────────────────────────────────────────────────────
+function getLog(){try{return JSON.parse(localStorage.getItem('l1_daily')||'[]');}catch{return[];}}
+function setLog(v){try{localStorage.setItem('l1_daily',JSON.stringify(v));}catch{}}
+
+// ── History ───────────────────────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('histList');
+  const log = getLog();
+  if(!log.length){
+    el.innerHTML=`<div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-text">မှတ်တမ်းမရှိသေးပါ<br>Entry ထည့်ပြီး Submit နှိပ်ပါ</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = log.map(e=>{
+    const netCls = e.net>0?'bal-pos':e.net<0?'bal-neg':'bal-zero';
+    const sign = e.net>0?'+':e.net<0?'-':'';
+    const txCount = (e.transfers||[]).length;
+    return `<div class="hist-card" onclick="showDetail('${e.date}')">
+      <div class="hist-top">
+        <div>
+          <div class="hist-date">${e.dateLabel}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px;">${e.dayName}${txCount?` · ${txCount} transfers`:''}</div>
+        </div>
+        <div class="hist-net ${netCls}">${e.net!==0?sign+fmt(e.net)+' ks':'—'}</div>
+      </div>
+      <div class="hist-pms">
+        ${PAYMENTS.filter(p=>e.close[p.id]>0).map(p=>`
+          <div class="hist-pm-chip">${p.label}: ${fmt(e.close[p.id])}</div>
+        `).join('')}
+      </div>
+      ${e.note?`<div class="hist-note">${e.note}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function showDetail(date) {
+  const e = getLog().find(x=>x.date===date);
+  if(!e) return;
+  const netCls = e.net>0?'color:var(--green)':e.net<0?'color:var(--red)':'color:var(--hint)';
+  const sign = e.net>0?'+':e.net<0?'-':'';
+  document.getElementById('modalTitle').textContent = e.dateLabel + ' · ' + e.dayName;
+  document.getElementById('modalBody').innerHTML = `
+    <table class="modal-table">
+      <tr><td colspan="2" style="color:var(--muted);font-size:10px;padding-bottom:4px;">OPENING</td></tr>
+      ${PAYMENTS.map(p=>`<tr><td>${p.label}</td><td>${fmt(e.open[p.id])} ks</td></tr>`).join('')}
+      <tr><td style="padding-top:8px;color:var(--muted);font-size:10px;" colspan="2">CLOSING</td></tr>
+      ${PAYMENTS.map(p=>`<tr><td>${p.label}</td><td>${fmt(e.close[p.id])} ks</td></tr>`).join('')}
+      ${e.transfers&&e.transfers.length?`
+        <tr><td style="padding-top:8px;color:var(--muted);font-size:10px;" colspan="2">TRANSFERS (${e.transfers.length})</td></tr>
+        ${e.transfers.map(tx=>`<tr><td style="color:${tx.dir==='in'?'var(--green)':'var(--red)'};">${tx.dir==='in'?'IN':'OUT'} · ${tx.from_to}</td><td>${fmt(tx.amount)} ks</td></tr>`).join('')}
+      `:''}
+      <tr><td style="padding-top:10px;font-weight:500;">Net</td><td style="padding-top:10px;font-weight:700;${netCls};">${sign}${fmt(e.net)} ks</td></tr>
+      ${e.note?`<tr><td colspan="2" style="padding-top:8px;color:var(--hint);font-size:11px;font-style:italic;">${e.note}</td></tr>`:''}
+    </table>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(e) {
+  if(!e||e.target===document.getElementById('modalOverlay')||e.currentTarget!==document.getElementById('modalOverlay'))
+    document.getElementById('modalOverlay').classList.remove('open');
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────
+function exportCSV() {
+  const log = getLog();
+  if(!log.length){showToast('မှတ်တမ်းမရှိသေးပါ');return;}
+  const hdrs = ['Date','Day','OpenTotal','CloseTotal','TxNet','Net','Note',
+    ...PAYMENTS.map(p=>p.label+'_Open'), ...PAYMENTS.map(p=>p.label+'_Close')];
+  const rows = log.map(e=>[
+    e.date, e.dayName, e.openTotal, e.closeTotal, e.txNet, e.net, `"${e.note||''}"`,
+    ...PAYMENTS.map(p=>e.open[p.id]||0),
+    ...PAYMENTS.map(p=>e.close[p.id]||0),
+  ]);
+  const csv = [hdrs, ...rows].map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `L1_April2025_${TODAY_KEY}.csv`;
+  a.click();
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ── Service Worker ────────────────────────────────────────────────────────
+if('serviceWorker' in navigator)
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
