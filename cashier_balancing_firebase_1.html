@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cashier Balancing — Sync</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+:root{
+  --c1:#6c63ff; --c1l:#ede9ff; --c1d:#4b44cc;
+  --c2:#ff6b9d; --c2l:#fff0f6;
+  --c3:#00c9a7; --c3l:#e0faf5;
+  --c4:#ffa94d; --c4l:#fff4e6;
+  --bg:#f0f2ff;
+  --surface:#ffffff;
+  --border:#e2e0f5;
+  --text:#1e1b4b;
+  --muted:#6b7280;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Nunito',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:1rem;
+  background-image:radial-gradient(circle at 10% 20%,#ddd8ff 0%,transparent 40%),
+                   radial-gradient(circle at 90% 80%,#ffd6e8 0%,transparent 40%);
+  min-height:100vh;}
+.app{max-width:860px;margin:0 auto;padding:1rem 0;}
+
+/* TITLE */
+.app>h1{
+  font-size:22px;font-weight:800;margin-bottom:1.25rem;
+  background:linear-gradient(135deg,var(--c1),var(--c2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+
+/* TABS */
+.tabs{display:flex;gap:6px;margin-bottom:1.25rem;flex-wrap:wrap;
+  background:#fff;padding:6px;border-radius:16px;
+  box-shadow:0 2px 12px rgba(108,99,255,0.1);}
+.tab{padding:7px 14px;font-size:12px;font-weight:700;border:none;border-radius:10px;
+  cursor:pointer;background:transparent;color:var(--muted);transition:all 0.2s;letter-spacing:0.02em;}
+.tab:hover{background:var(--c1l);color:var(--c1);}
+.tab.active{background:linear-gradient(135deg,var(--c1),#8b85ff);color:#fff;
+  box-shadow:0 3px 10px rgba(108,99,255,0.35);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* CARD */
+.card{background:var(--surface);border:1.5px solid var(--border);
+  border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;
+  box-shadow:0 2px 16px rgba(108,99,255,0.07);}
+
+/* CASHIER HEADER */
+.cashier-header{display:flex;align-items:center;gap:10px;margin-bottom:1rem;}
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.cashier-name{font-size:15px;font-weight:800;color:var(--text);}
+.shift-badge{font-size:11px;padding:3px 10px;border-radius:20px;
+  background:linear-gradient(135deg,var(--c1l),var(--c2l));
+  color:var(--c1d);margin-left:auto;font-weight:700;border:1px solid #ddd8ff;}
+
+/* SECTION HEADER */
+.section-hdr{font-size:10px;font-weight:800;color:var(--c1);
+  text-transform:uppercase;letter-spacing:0.08em;margin:1rem 0 0.6rem;
+  display:flex;align-items:center;gap:6px;}
+.section-hdr::before{content:'';display:inline-block;width:3px;height:12px;
+  border-radius:2px;background:linear-gradient(var(--c1),var(--c2));}
+
+/* PAYMENT GRID */
+.pm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:0.75rem;}
+.pm-block{border-radius:10px;padding:8px 10px;border:1.5px solid transparent;transition:border-color 0.2s;}
+.pm-block:nth-child(7n+1){background:#f0edff;border-color:#d4cfff;}
+.pm-block:nth-child(7n+2){background:#fff0f9;border-color:#ffc8e6;}
+.pm-block:nth-child(7n+3){background:#e8fdf7;border-color:#b3f0e3;}
+.pm-block:nth-child(7n+4){background:#fff8ed;border-color:#ffd9a0;}
+.pm-block:nth-child(7n+5){background:#edf5ff;border-color:#b3d4ff;}
+.pm-block:nth-child(7n+6){background:#fff0f0;border-color:#ffc8c8;}
+.pm-block:nth-child(7n+7){background:#f0fff8;border-color:#b3f0d0;}
+.pm-label{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700;}
+.pm-limit{font-size:9px;color:#b0b0c0;margin-top:3px;font-weight:600;}
+
+/* INPUTS */
+input[type=number],input[type=text]{width:100%;font-size:13px;font-weight:700;
+  padding:5px 7px;border:1.5px solid #ddd8ff;border-radius:7px;
+  background:#fff;color:var(--text);font-family:'Nunito',sans-serif;}
+input:focus{outline:none;border-color:var(--c1);box-shadow:0 0 0 3px rgba(108,99,255,0.15);}
+select{width:100%;font-size:12px;font-weight:700;padding:5px 7px;
+  border:1.5px solid #ddd8ff;border-radius:7px;background:#fff;color:var(--text);
+  font-family:'Nunito',sans-serif;}
+select:focus{outline:none;border-color:var(--c1);}
+
+/* BALANCE TABLE */
+.bal-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed;border-radius:10px;overflow:hidden;}
+.bal-table th{background:linear-gradient(135deg,var(--c1l),#f0f0ff);
+  padding:7px 8px;text-align:left;font-weight:800;font-size:10px;
+  color:var(--c1d);border-bottom:2px solid #ddd8ff;letter-spacing:0.04em;}
+.bal-table td{padding:6px 8px;border-bottom:1px solid #f0eeff;color:var(--text);vertical-align:middle;}
+.bal-table tr:last-child td{border-bottom:none;font-weight:800;background:linear-gradient(135deg,#f5f3ff,#fff0f9);}
+.amt{text-align:right;font-variant-numeric:tabular-nums;}
+.ok{color:#0ea874;font-weight:700;}
+.warn{color:#f59e0b;font-weight:700;}
+.over{color:#ef4444;font-weight:700;}
+
+/* BUTTONS */
+.save-btn{width:100%;padding:10px;font-size:13px;font-weight:800;border:none;
+  border-radius:10px;cursor:pointer;margin-top:10px;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  box-shadow:0 4px 14px rgba(108,99,255,0.35);transition:opacity 0.15s,transform 0.1s;
+  font-family:'Nunito',sans-serif;letter-spacing:0.03em;}
+.save-btn:hover{opacity:0.9;transform:translateY(-1px);}
+.save-btn:active{transform:scale(0.98);}
+.add-btn{padding:7px 14px;font-size:12px;font-weight:700;border:1.5px solid var(--c1);
+  border-radius:8px;cursor:pointer;background:var(--c1l);color:var(--c1);
+  font-family:'Nunito',sans-serif;}
+.add-btn:hover{background:var(--c1);color:#fff;}
+
+/* NOTE */
+.note-area{width:100%;font-size:12px;font-weight:600;padding:8px 10px;
+  border:1.5px solid #ddd8ff;border-radius:9px;background:#fafafe;
+  color:var(--text);resize:none;margin-top:4px;font-family:'Nunito',sans-serif;}
+.note-area:focus{outline:none;border-color:var(--c1);}
+
+/* TRANSFER ROW */
+.tx-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;gap:6px;align-items:center;
+  margin-bottom:8px;background:#f8f7ff;border-radius:10px;padding:8px;border:1px solid #e8e5ff;}
+.tx-badge{display:inline-block;font-size:10px;padding:3px 9px;border-radius:20px;font-weight:800;}
+.badge-in{background:#d1fae5;color:#065f46;}
+.badge-out{background:#ffe4e6;color:#9f1239;}
+.del-btn{width:24px;height:24px;border:1.5px solid #ffc8c8;border-radius:6px;cursor:pointer;
+  background:#fff0f0;color:#ef4444;font-size:13px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;}
+.del-btn:hover{background:#ef4444;color:#fff;border-color:#ef4444;}
+
+/* SUMMARY */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem;}
+.metric{border-radius:12px;padding:0.9rem 1rem;position:relative;overflow:hidden;}
+.metric:nth-child(1){background:linear-gradient(135deg,#f0edff,#e8e4ff);border:1.5px solid #c4bcff;}
+.metric:nth-child(2){background:linear-gradient(135deg,#e8fdf7,#d0f8ec);border:1.5px solid #86efcf;}
+.metric:nth-child(3){background:linear-gradient(135deg,#fff8ed,#ffecd0);border:1.5px solid #fcd09a;}
+.metric:nth-child(4){background:linear-gradient(135deg,#fff0f9,#ffe0f0);border:1.5px solid #f9a8d4;}
+.metric-lbl{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700;}
+.metric-val{font-size:19px;font-weight:800;color:var(--text);}
+
+/* TX LOG */
+.tx-log-row{padding:8px 0;border-bottom:1px solid #f0eeff;font-size:12px;}
+.tx-log-row:last-child{border-bottom:none;}
+
+/* PROGRESS BARS */
+.bar-wrap{margin-bottom:9px;}
+.bar-track{height:7px;background:#f0eeff;border-radius:4px;margin-top:4px;overflow:hidden;}
+.bar-fill{height:7px;border-radius:4px;}
+
+/* MISC */
+.clear-btn{font-size:11px;padding:5px 12px;border:1.5px solid #ffc8c8;border-radius:8px;
+  cursor:pointer;background:#fff0f0;color:#ef4444;font-weight:700;}
+.clear-btn:hover{background:#ef4444;color:#fff;}
+.divider{border:none;border-top:2px dashed #e8e4ff;margin:0.9rem 0;}
+
+/* SYNC STATUS BAR */
+.sync-bar{
+  position:sticky;top:0;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 14px;margin-bottom:12px;border-radius:10px;
+  font-size:11px;font-weight:700;gap:8px;
+  transition:background 0.3s,color 0.3s;
+}
+.sync-bar.online{background:#d1fae5;color:#065f46;border:1.5px solid #6ee7b7;}
+.sync-bar.offline{background:#ffe4e6;color:#9f1239;border:1.5px solid #fca5a5;}
+.sync-bar.syncing{background:#fef3c7;color:#92400e;border:1.5px solid #fcd34d;}
+.sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.sync-dot.online{background:#059669;}
+.sync-dot.offline{background:#dc2626;}
+.sync-dot.syncing{background:#d97706;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4;}}
+.sync-device{font-size:10px;opacity:0.7;margin-left:auto;}
+
+/* DAY CHECK */
+.check-banner-ok{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border:1.5px solid #6ee7b7;
+  border-radius:12px;padding:12px;text-align:center;margin-bottom:12px;}
+.check-banner-fail{background:linear-gradient(135deg,#ffe4e6,#fecdd3);border:1.5px solid #fca5a5;
+  border-radius:12px;padding:12px;text-align:center;margin-bottom:12px;}
+.check-banner-icon{font-size:22px;margin-bottom:4px;}
+.check-banner-txt{font-size:13px;font-weight:800;}
+.check-days-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.check-day-box{border-radius:10px;padding:8px 12px;}
+.check-day-box.prev{background:linear-gradient(135deg,#f0edff,#e8e4ff);border:1.5px solid #c4bcff;}
+.check-day-box.next{background:linear-gradient(135deg,#fff0f9,#ffe0f0);border:1.5px solid #f9a8d4;}
+.check-day-lbl{font-size:9px;font-weight:800;color:var(--muted);letter-spacing:0.06em;margin-bottom:3px;}
+.check-day-val{font-size:12px;font-weight:800;color:var(--c1d);}
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;}
+.check-item{border-radius:10px;padding:10px;text-align:center;border:1.5px solid transparent;}
+.ci-match{background:#d1fae5;border-color:#6ee7b7;}
+.ci-fail{background:#ffe4e6;border-color:#fca5a5;}
+.ci-empty{background:#f5f5f0;border-color:#e5e5e0;}
+.ci-pm{font-size:11px;font-weight:800;color:var(--muted);margin-bottom:5px;}
+.ci-prev{font-size:10px;font-weight:700;color:#6c63ff;margin-bottom:1px;}
+.ci-next{font-size:10px;font-weight:700;color:#ff6b9d;margin-bottom:5px;}
+.ci-badge{font-size:10px;font-weight:800;padding:2px 9px;border-radius:20px;display:inline-block;}
+.ci-badge.ok{background:#059669;color:#fff;}
+.ci-badge.fail{background:#dc2626;color:#fff;}
+.ci-badge.na{background:#ccc;color:#fff;}
+.ci-diff{font-size:11px;font-weight:800;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="app">
+<h1 style="font-size:22px;font-weight:800;margin-bottom:0.75rem;background:linear-gradient(135deg,#6c63ff,#ff6b9d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Cashier Balancing</h1>
+
+<!-- SYNC STATUS BAR -->
+<div class="sync-bar offline" id="syncBar">
+  <div class="sync-dot offline" id="syncDot"></div>
+  <span id="syncTxt">Firebase နဲ့ ချိတ်ဆက်နေသည်...</span>
+  <span class="sync-device" id="deviceId"></span>
+</div>
+
+<div class="tabs" id="maintabs">
+  <button class="tab active" onclick="switchTab('L1')">L1 · 7–11AM</button>
+  <button class="tab" onclick="switchTab('L2')">L2 · 11AM–2:30</button>
+  <button class="tab" onclick="switchTab('L3')">L3 · 2:30–6:30</button>
+  <button class="tab" onclick="switchTab('L4')">L4 · 6:30–11:30</button>
+  <button class="tab" onclick="switchTab('transfers')">လွှဲငွေမှတ်တမ်း</button>
+  <button class="tab" onclick="switchTab('daycheck')" style="background:linear-gradient(135deg,#fff0f9,#f0edff);color:#6c63ff;border:1.5px solid #ddd8ff;">✅ Day Check</button>
+  <button class="tab" onclick="switchTab('summary')">Summary</button>
+</div>
+
+<div id="tab-L1" class="tab-content active"></div>
+<div id="tab-L2" class="tab-content"></div>
+<div id="tab-L3" class="tab-content"></div>
+<div id="tab-L4" class="tab-content"></div>
+<div id="tab-transfers" class="tab-content"></div>
+<div id="tab-daycheck" class="tab-content">
+  <div class="card">
+    <div class="section-hdr">ရက် ၂ ရက်ကြား Balance စစ်ဆေးမှု</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:var(--muted);margin-bottom:5px;letter-spacing:0.05em;">▼ ရက် ၁ · Closing Balance</div>
+        <select id="chk_day1" onchange="runDayCheck()" style="border-color:#c4bcff;"></select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:var(--muted);margin-bottom:5px;letter-spacing:0.05em;">▲ ရက် ၂ · Opening Balance</div>
+        <select id="chk_day2" onchange="runDayCheck()" style="border-color:#f9a8d4;"></select>
+      </div>
+    </div>
+    <div id="chkResult"><div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Entry save ပြီးမှ စစ်နိုင်ပါသည်</div></div>
+  </div>
+</div>
+<div id="tab-summary" class="tab-content"></div>
+</div>
+
+<script>
+// ── Firebase Config ──────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyD1zxMhKuYBjwexV9YCVXzf6gGkOY6Divs",
+  authDomain: "balancing-924ac.firebaseapp.com",
+  databaseURL: "https://balancing-924ac-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "balancing-924ac",
+  storageBucket: "balancing-924ac.firebasestorage.app",
+  messagingSenderId: "530214217059",
+  appId: "1:530214217059:web:af366d29bde7a8db111f56"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ── Device ID (ဖုန်းတစ်လုံးချင်း ခွဲခြားဖို့) ─────────────────────────────
+let DEVICE_ID = localStorage.getItem('cb_device_id');
+if (!DEVICE_ID) {
+  DEVICE_ID = 'Device-' + Math.random().toString(36).slice(2,6).toUpperCase();
+  localStorage.setItem('cb_device_id', DEVICE_ID);
+}
+document.getElementById('deviceId').textContent = DEVICE_ID;
+
+// ── Sync Status ──────────────────────────────────────────────────────────
+function setSyncStatus(status, msg) {
+  const bar = document.getElementById('syncBar');
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncTxt');
+  bar.className = 'sync-bar ' + status;
+  dot.className = 'sync-dot ' + status;
+  txt.textContent = msg;
+}
+
+// Online/Offline detection
+db.ref('.info/connected').on('value', snap => {
+  if (snap.val()) {
+    setSyncStatus('online', '🟢 Firebase နဲ့ ချိတ်ဆက်ပြီး — Real-time sync အသက်ဝင်သည်');
+  } else {
+    setSyncStatus('offline', '🔴 Offline — Local သိမ်းနေသည် (ပြန်ဆက်မိတာနဲ့ auto sync ဖြစ်မည်)');
+  }
+});
+
+// ── Data Config ──────────────────────────────────────────────────────────
+const CASHIERS=[
+  {id:'L1',name:'Cashier L1',shift:'7:00 AM – 11:00 AM',bg:'#B5D4F4',tc:'#0C447C'},
+  {id:'L2',name:'Cashier L2',shift:'11:00 AM – 2:30 PM',bg:'#9FE1CB',tc:'#085041'},
+  {id:'L3',name:'Cashier L3',shift:'2:30 PM – 6:30 PM',bg:'#FAC775',tc:'#633806'},
+  {id:'L4',name:'Cashier L4',shift:'6:30 PM – 11:30 PM',bg:'#F4C0D1',tc:'#72243E'},
+];
+const PAYMENTS=[
+  {id:'kpay1',label:'KPay 1',limit:2000000},
+  {id:'kpay2',label:'KPay 2',limit:2000000},
+  {id:'wave1',label:'Wave 1',limit:1000000},
+  {id:'wave2',label:'Wave 2',limit:1000000},
+  {id:'banking',label:'Banking',limit:5000000},
+  {id:'one',label:'One',limit:null},
+  {id:'trident',label:'Trident',limit:null},
+];
+const fmt = n => Math.round(n).toLocaleString();
+
+// ── Firebase Read/Write helpers ──────────────────────────────────────────
+// Local cache (offline fallback)
+const LOCAL = {
+  get: k => { try { return JSON.parse(localStorage.getItem('cb_'+k)||'null'); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem('cb_'+k, JSON.stringify(v)); } catch {} }
+};
+
+function fbSet(path, data) {
+  setSyncStatus('syncing', '🔄 Syncing...');
+  return db.ref(path).set(data)
+    .then(() => setSyncStatus('online', '🟢 Sync ပြီး — ဖုန်း 4 လုံးလုံး update ဖြစ်သည်'))
+    .catch(() => setSyncStatus('offline', '🔴 Sync မအောင်မြင် — Local သာ သိမ်းထားသည်'));
+}
+
+function getCashierState(id) {
+  return LOCAL.get(id) || {open:{},close:{},note:'',transfers:[]};
+}
+
+function getTxLog() { return LOCAL.get('txlog') || []; }
+function setTxLog(v) { LOCAL.set('txlog', v); }
+
+// ── Real-time listener — ဖုန်းတခြားမှ update လာရင် UI refresh ─────────────
+const listeners = {};
+function watchCashier(cid) {
+  if (listeners[cid]) return;
+  listeners[cid] = db.ref('cashiers/'+cid).on('value', snap => {
+    const data = snap.val();
+    if (!data) return;
+    // Only update if NOT from this device (avoid overwriting own input mid-type)
+    if (data._device === DEVICE_ID) return;
+    LOCAL.set(cid, data);
+    // Refresh UI fields silently
+    PAYMENTS.forEach(p => {
+      const oi = document.getElementById(cid+'_open_'+p.id);
+      const ci = document.getElementById(cid+'_close_'+p.id);
+      if (oi && data.open) oi.value = data.open[p.id] || '';
+      if (ci && data.close) ci.value = data.close[p.id] || '';
+    });
+    const ni = document.getElementById(cid+'_note');
+    if (ni && data.note !== undefined) ni.value = data.note;
+    rerenderTxRows(cid, data.transfers || []);
+    calcBal(cid);
+    setSyncStatus('online', '🟢 ' + (data._device||'တခြားဖုန်း') + ' မှ update ရောက်သည်');
+    setTimeout(() => setSyncStatus('online', '🟢 Firebase နဲ့ ချိတ်ဆက်ပြီး — Real-time sync အသက်ဝင်သည်'), 2500);
+  });
+}
+
+// Watch tx log for summary tab
+db.ref('txlog').on('value', snap => {
+  const data = snap.val();
+  if (!data) return;
+  LOCAL.set('txlog', data);
+});
+
+// Watch L1 daylog for Day Check
+db.ref('l1_daylog').on('value', snap => {
+  const data = snap.val();
+  if (!data) return;
+  LOCAL.set('l1_daylog', Array.isArray(data) ? data : Object.values(data));
+});
+
+// ── Build cashier tab UI ─────────────────────────────────────────────────
+function buildPmGrid(cid, phase, saved) {
+  return `<div class="pm-grid">${PAYMENTS.map(p => {
+    const val = saved && saved[phase] && saved[phase][p.id] != null ? saved[phase][p.id] : '';
+    return `<div class="pm-block">
+      <div class="pm-label">${p.label}</div>
+      <input type="number" id="${cid}_${phase}_${p.id}" placeholder="0" value="${val}" oninput="calcBal('${cid}')">
+      <div class="pm-limit">${p.limit ? 'Max: '+fmt(p.limit)+' ks' : 'ကန့်သတ်မရှိ'}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function buildOneTxRow(cid, i, tx) {
+  const pOpts = PAYMENTS.map(p=>`<option value="${p.id}"${tx.payment===p.id?' selected':''}>${p.label}</option>`).join('');
+  if (tx.type === 'cashier') {
+    const cOpts = CASHIERS.filter(c=>c.id!==cid).map(c=>`<option value="${c.id}"${tx.counterpart===c.id?' selected':''}>${c.name}</option>`).join('');
+    const dirOpts = ['in','out'].map(d=>`<option value="${d}"${tx.dir===d?' selected':''}>${d==='in'?'ငွေယူ (IN)':'ငွေပေး (OUT)'}</option>`).join('');
+    return `<div class="tx-row" id="${cid}_txrow_${i}">
+      <select onchange="updateTx('${cid}',${i},'dir',this.value)">${dirOpts}</select>
+      <select onchange="updateTx('${cid}',${i},'counterpart',this.value)">${cOpts}</select>
+      <select onchange="updateTx('${cid}',${i},'payment',this.value)">${pOpts}</select>
+      <input type="number" placeholder="ပမာဏ" value="${tx.amount||''}" oninput="updateTx('${cid}',${i},'amount',this.value)" onchange="calcBal('${cid}')">
+      <button class="del-btn" onclick="delTx('${cid}',${i})">×</button>
+    </div>`;
+  } else {
+    const dirOpts = ['in','out'].map(d=>`<option value="${d}"${tx.dir===d?' selected':''}>${d==='in'?'ငွေဝင် (IN)':'ငွေထွက် (OUT)'}</option>`).join('');
+    return `<div class="tx-row" id="${cid}_txrow_${i}">
+      <select onchange="updateTx('${cid}',${i},'dir',this.value)">${dirOpts}</select>
+      <input type="text" placeholder="ပြင်ပနာမည်" value="${tx.label||''}" oninput="updateTx('${cid}',${i},'label',this.value)" style="font-size:13px;padding:4px 6px;border:1.5px solid #ddd8ff;border-radius:7px;background:#fff;color:#1e1b4b;width:100%;font-family:Nunito,sans-serif;">
+      <select onchange="updateTx('${cid}',${i},'payment',this.value)">${pOpts}</select>
+      <input type="number" placeholder="ပမာဏ" value="${tx.amount||''}" oninput="updateTx('${cid}',${i},'amount',this.value)" onchange="calcBal('${cid}')">
+      <button class="del-btn" onclick="delTx('${cid}',${i})">×</button>
+    </div>`;
+  }
+}
+
+function buildTransferRows(cid, txs) {
+  if (!txs || !txs.length) txs = [];
+  const rows = txs.map((tx,i) => buildOneTxRow(cid,i,tx)).join('');
+  return `<div id="${cid}_txrows">${rows}</div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <button class="add-btn" onclick="addTx('${cid}','cashier')">+ Cashier မှ/ဆီ</button>
+    <button class="add-btn" onclick="addTx('${cid}','external')">+ ပြင်ပ လွှဲငွေ</button>
+  </div>`;
+}
+
+function buildCashierTab(c) {
+  const saved = getCashierState(c.id);
+  const el = document.getElementById('tab-'+c.id);
+  el.innerHTML = `
+<div class="card">
+  <div class="cashier-header">
+    <div class="avatar" style="background:${c.bg};color:${c.tc};">${c.id}</div>
+    <div><div class="cashier-name">${c.name}</div></div>
+    <div class="shift-badge">${c.shift}</div>
+  </div>
+  <div class="section-hdr">Opening — Shift စချိန် လက်ကျန်ငွေ</div>
+  ${buildPmGrid(c.id,'open',saved)}
+  <div class="section-hdr">ငွေလွှဲ / ငွေယူ မှတ်တမ်း</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;gap:6px;margin-bottom:4px;">
+    <span style="font-size:10px;color:var(--muted);">အမျိုးအစား</span>
+    <span style="font-size:10px;color:var(--muted);">မှ/ဆီ/နာမည်</span>
+    <span style="font-size:10px;color:var(--muted);">Payment</span>
+    <span style="font-size:10px;color:var(--muted);">ပမာဏ (ks)</span>
+    <span></span>
+  </div>
+  ${buildTransferRows(c.id, saved.transfers)}
+  <hr class="divider">
+  <div class="section-hdr">Closing — Shift ပြီးချိန် လက်ကျန်ငွေ</div>
+  ${buildPmGrid(c.id,'close',saved)}
+  <div class="section-hdr">Balance ခြုံငုံသုံးသပ်ချက်</div>
+  <div id="${c.id}_bal"></div>
+  <div class="section-hdr">မှတ်ချက်</div>
+  <textarea class="note-area" id="${c.id}_note" rows="2" placeholder="မှတ်ချက်...">${saved.note||''}</textarea>
+  <button class="save-btn" onclick="saveEntry('${c.id}')">Save · ${c.name} → Firebase Sync</button>
+</div>`;
+  calcBal(c.id);
+  watchCashier(c.id); // Start real-time listener
+}
+
+function addTx(cid, type) {
+  const state = getCashierState(cid);
+  if (!state.transfers) state.transfers = [];
+  const other = CASHIERS.find(c=>c.id!==cid);
+  state.transfers.push(type==='cashier'
+    ? {type:'cashier',dir:'in',counterpart:other?other.id:'',payment:'kpay1',amount:''}
+    : {type:'external',dir:'in',label:'',payment:'kpay1',amount:''});
+  LOCAL.set(cid, state);
+  rerenderTxRows(cid, state.transfers);
+  calcBal(cid);
+}
+
+function delTx(cid, i) {
+  const state = getCashierState(cid);
+  state.transfers.splice(i, 1);
+  LOCAL.set(cid, state);
+  rerenderTxRows(cid, state.transfers);
+  calcBal(cid);
+}
+
+function updateTx(cid, i, field, val) {
+  const state = getCashierState(cid);
+  if (!state.transfers[i]) return;
+  state.transfers[i][field] = val;
+  LOCAL.set(cid, state);
+}
+
+function rerenderTxRows(cid, txs) {
+  const el = document.getElementById(cid+'_txrows');
+  if (!el) return;
+  el.innerHTML = (txs||[]).map((tx,i) => buildOneTxRow(cid,i,tx)).join('');
+}
+
+function calcBal(cid) {
+  const state = getCashierState(cid);
+  const el = document.getElementById(cid+'_bal');
+  if (!el) return;
+  const txs = state.transfers || [];
+  let rows = `<table class="bal-table">
+  <thead><tr>
+    <th style="width:18%">Payment</th>
+    <th class="amt" style="width:16%">Opening</th>
+    <th class="amt" style="width:16%">+IN / -OUT</th>
+    <th class="amt" style="width:16%">Closing</th>
+    <th class="amt" style="width:18%">ကွာခြားချက်</th>
+    <th class="amt" style="width:16%">Status</th>
+  </tr></thead><tbody>`;
+  let totO=0,totTx=0,totC=0;
+  PAYMENTS.forEach(p => {
+    const o = parseFloat(document.getElementById(cid+'_open_'+p.id)?.value)||0;
+    const cl = parseFloat(document.getElementById(cid+'_close_'+p.id)?.value)||0;
+    const txNet = txs.filter(tx=>tx.payment===p.id&&tx.amount).reduce((s,tx)=>{const a=parseFloat(tx.amount)||0;return s+(tx.dir==='in'?a:-a);},0);
+    const diff = cl-o;
+    totO+=o;totTx+=txNet;totC+=cl;
+    let cls='ok',lbl='OK';
+    if(p.limit){if(cl>p.limit){cls='over';lbl='Limit ကျော်';}else if(cl>p.limit*0.85){cls='warn';lbl='နီးနေပြီ';}}else{lbl='—';}
+    rows += `<tr>
+      <td>${p.label}</td>
+      <td class="amt">${fmt(o)}</td>
+      <td class="amt ${txNet>0?'ok':txNet<0?'over':''}">${txNet!==0?(txNet>0?'+':'')+fmt(txNet):'—'}</td>
+      <td class="amt">${fmt(cl)}</td>
+      <td class="amt ${diff>=0?'ok':'over'}">${diff>=0?'+':''}${fmt(diff)}</td>
+      <td class="amt ${cls}">${lbl}</td>
+    </tr>`;
+  });
+  const net=totC-totO;
+  rows += `<tr><td>စုစုပေါင်း</td><td class="amt">${fmt(totO)}</td>
+    <td class="amt ${totTx>0?'ok':totTx<0?'over':''}">${totTx?((totTx>0?'+':'')+fmt(totTx)):'—'}</td>
+    <td class="amt">${fmt(totC)}</td>
+    <td class="amt ${net>=0?'ok':'over'}">${net>=0?'+':''}${fmt(net)}</td>
+    <td class="amt">—</td></tr></tbody></table>`;
+  el.innerHTML = rows;
+}
+
+// ── SAVE — Firebase ထဲ push ─────────────────────────────────────────────
+function saveEntry(cid) {
+  const state = getCashierState(cid);
+  PAYMENTS.forEach(p => {
+    state.open[p.id]  = parseFloat(document.getElementById(cid+'_open_'+p.id).value)||0;
+    state.close[p.id] = parseFloat(document.getElementById(cid+'_close_'+p.id).value)||0;
+  });
+  state.note = document.getElementById(cid+'_note').value;
+  state._device = DEVICE_ID;
+  state._savedAt = new Date().toISOString();
+  LOCAL.set(cid, state);
+
+  // Push to Firebase
+  fbSet('cashiers/'+cid, state);
+
+  // TX log
+  const now = new Date();
+  const ts = now.toLocaleDateString('en-GB')+' '+now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const log = getTxLog();
+  log.unshift({cid,ts,
+    totO: PAYMENTS.reduce((s,p)=>s+(state.open[p.id]||0),0),
+    totC: PAYMENTS.reduce((s,p)=>s+(state.close[p.id]||0),0),
+    note: state.note,
+    txs: state.transfers||[]
+  });
+  if(log.length>60) log.pop();
+  setTxLog(log);
+  fbSet('txlog', log);
+
+  // L1 Day Check snapshot
+  if (cid === 'L1') saveL1Snapshot(state);
+
+  // Button feedback
+  const btn = document.querySelector(`#tab-${cid} .save-btn`);
+  if(btn){
+    const orig = btn.textContent;
+    btn.textContent = '✓ Saved + Synced!';
+    btn.style.background = 'linear-gradient(135deg,#059669,#0ea874)';
+    setTimeout(()=>{btn.textContent=orig;btn.style.background='';},2000);
+  }
+  renderSummary();
+}
+
+// ── Transfer log tab ─────────────────────────────────────────────────────
+function renderTransferTab() {
+  const el = document.getElementById('tab-transfers');
+  const log = getTxLog();
+  if(!log.length){el.innerHTML='<div class="card" style="font-size:13px;color:var(--muted);text-align:center;padding:2rem;">မှတ်တမ်းမရှိသေးပါ</div>';return;}
+  const allTx=[];
+  log.forEach(entry=>{(entry.txs||[]).forEach(tx=>{allTx.push({...tx,cid:entry.cid,ts:entry.ts});});});
+  const cashierTx=allTx.filter(t=>t.type==='cashier');
+  const extTx=allTx.filter(t=>t.type==='external');
+
+  el.innerHTML=`
+<div class="card">
+  <div class="section-hdr" style="margin-top:0;">Cashier အချင်းချင်း ငွေလွှဲမှတ်တမ်း</div>
+  ${cashierTx.length?cashierTx.slice(0,20).map(tx=>{
+    const c=CASHIERS.find(x=>x.id===tx.cid);
+    const other=CASHIERS.find(x=>x.id===tx.counterpart);
+    const pm=PAYMENTS.find(x=>x.id===tx.payment);
+    return `<div class="tx-log-row">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="tx-badge ${tx.dir==='in'?'badge-in':'badge-out'}">${tx.dir==='in'?'IN':'OUT'}</span>
+        <span style="font-weight:700;">${c?c.name:tx.cid}</span>
+        <span style="color:#888;">${tx.dir==='in'?'←':'→'}</span>
+        <span style="font-weight:700;">${other?other.name:tx.counterpart}</span>
+        <span style="color:#b0b0c0;">· ${pm?pm.label:tx.payment}</span>
+        <span style="margin-left:auto;font-weight:700;color:${tx.dir==='in'?'#0ea874':'#ef4444'};">${fmt(parseFloat(tx.amount)||0)} ks</span>
+      </div>
+      <div style="font-size:11px;color:#b0b0c0;margin-top:2px;">${tx.ts}</div>
+    </div>`;
+  }).join(''):'<div style="font-size:12px;color:#b0b0c0;padding:6px 0;">မရှိသေးပါ</div>'}
+</div>
+<div class="card">
+  <div class="section-hdr" style="margin-top:0;">ပြင်ပ ငွေလွှဲမှတ်တမ်း</div>
+  ${extTx.length?extTx.slice(0,20).map(tx=>{
+    const c=CASHIERS.find(x=>x.id===tx.cid);
+    const pm=PAYMENTS.find(x=>x.id===tx.payment);
+    return `<div class="tx-log-row">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="tx-badge ${tx.dir==='in'?'badge-in':'badge-out'}">${tx.dir==='in'?'IN':'OUT'}</span>
+        <span style="font-weight:700;">${c?c.name:tx.cid}</span>
+        <span style="color:#888;">${tx.dir==='in'?'←':'→'}</span>
+        <span>${tx.label||'ပြင်ပ'}</span>
+        <span style="color:#b0b0c0;">· ${pm?pm.label:tx.payment}</span>
+        <span style="margin-left:auto;font-weight:700;color:${tx.dir==='in'?'#0ea874':'#ef4444'};">${fmt(parseFloat(tx.amount)||0)} ks</span>
+      </div>
+      <div style="font-size:11px;color:#b0b0c0;margin-top:2px;">${tx.ts}</div>
+    </div>`;
+  }).join(''):'<div style="font-size:12px;color:#b0b0c0;padding:6px 0;">မရှိသေးပါ</div>'}
+</div>
+<div style="display:flex;justify-content:flex-end;">
+  <button class="clear-btn" onclick="if(confirm('မှတ်တမ်းအားလုံး ဖျက်မလား? Firebase မှပါ ဖျက်မည်')){clearAll();}">မှတ်တမ်းရှင်းမည်</button>
+</div>`;
+}
+
+function clearAll() {
+  ['L1','L2','L3','L4','txlog','l1_daylog'].forEach(k=>{
+    localStorage.removeItem('cb_'+k);
+    db.ref(k==='txlog'||k==='l1_daylog'?k:'cashiers/'+k).remove();
+  });
+  location.reload();
+}
+
+// ── Summary ──────────────────────────────────────────────────────────────
+function renderSummary() {
+  const el = document.getElementById('tab-summary');
+  let grandO=0,grandC=0;
+  const rows = CASHIERS.map(c=>{
+    const d = getCashierState(c.id);
+    const o = PAYMENTS.reduce((s,p)=>s+(d.open[p.id]||0),0);
+    const cl = PAYMENTS.reduce((s,p)=>s+(d.close[p.id]||0),0);
+    const txNet = (d.transfers||[]).reduce((s,tx)=>{const a=parseFloat(tx.amount)||0;return s+(tx.dir==='in'?a:-a);},0);
+    grandO+=o; grandC+=cl;
+    return {c,o,cl,txNet,diff:cl-o};
+  });
+  const net=grandC-grandO;
+  el.innerHTML=`
+<div class="summary-grid">
+  <div class="metric"><div class="metric-lbl">ဝန်ထမ်း</div><div class="metric-val">4</div></div>
+  <div class="metric"><div class="metric-lbl">Opening (စုစုပေါင်း)</div><div class="metric-val">${fmt(grandO)} ks</div></div>
+  <div class="metric"><div class="metric-lbl">Closing (စုစုပေါင်း)</div><div class="metric-val">${fmt(grandC)} ks</div></div>
+  <div class="metric"><div class="metric-lbl">Net ကွာခြားချက်</div><div class="metric-val" style="color:${net>=0?'#0ea874':'#ef4444'};">${net>=0?'+':''}${fmt(net)} ks</div></div>
+</div>
+<div class="card" style="padding:0;overflow:hidden;">
+<table class="bal-table" style="font-size:13px;">
+<thead><tr>
+  <th style="width:20%">Cashier</th><th style="width:25%">Shift</th>
+  <th class="amt" style="width:16%">Opening</th><th class="amt" style="width:16%">TX Net</th>
+  <th class="amt" style="width:16%">Closing</th><th class="amt" style="width:7%">Net</th>
+</tr></thead>
+<tbody>
+${rows.map(r=>`<tr>
+  <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:20px;height:20px;border-radius:50%;background:${r.c.bg};flex-shrink:0;"></div><span style="font-size:12px;">${r.c.name}</span></div></td>
+  <td style="font-size:11px;color:#888;">${r.c.shift}</td>
+  <td class="amt">${fmt(r.o)}</td>
+  <td class="amt" style="color:${r.txNet>0?'#0ea874':r.txNet<0?'#ef4444':'#aaa'};">${r.txNet!==0?(r.txNet>0?'+':'')+fmt(r.txNet):'—'}</td>
+  <td class="amt">${fmt(r.cl)}</td>
+  <td class="amt" style="color:${r.diff>=0?'#0ea874':'#ef4444'};">${r.diff>=0?'+':''}${fmt(r.diff)}</td>
+</tr>`).join('')}
+<tr style="font-weight:700;background:linear-gradient(135deg,#f5f3ff,#fff0f9);">
+  <td colspan="2">စုစုပေါင်း</td>
+  <td class="amt">${fmt(grandO)}</td><td class="amt">—</td>
+  <td class="amt">${fmt(grandC)}</td>
+  <td class="amt" style="color:${net>=0?'#0ea874':'#ef4444'};">${net>=0?'+':''}${fmt(net)}</td>
+</tr>
+</tbody></table>
+</div>
+<div class="card">
+  <div class="section-hdr" style="margin-top:0;">Payment Acc Limit အခြေအနေ</div>
+  ${CASHIERS.map(c=>{
+    const d=getCashierState(c.id);
+    return PAYMENTS.filter(p=>p.limit).map(p=>{
+      const cl=d&&d.close[p.id]?d.close[p.id]:0;
+      const pct=Math.min(100,Math.round(cl/p.limit*100));
+      const color=pct>90?'#E24B4A':pct>70?'#BA7517':'#639922';
+      return `<div class="bar-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:#888;">${c.name} · ${p.label}</span>
+          <span>${fmt(cl)} / ${fmt(p.limit)} ks</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+      </div>`;
+    }).join('');
+  }).join('')}
+</div>`;
+}
+
+// ── Tab switch ────────────────────────────────────────────────────────────
+function switchTab(id){
+  const ids=['L1','L2','L3','L4','transfers','daycheck','summary'];
+  document.querySelectorAll('#maintabs .tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if(id==='transfers')renderTransferTab();
+  if(id==='summary')renderSummary();
+  if(id==='daycheck')initDayCheck();
+}
+
+// ── Day Check ─────────────────────────────────────────────────────────────
+const CHECK_PMS=['kpay1','kpay2','wave1','wave2','banking'];
+const CHECK_LABELS={kpay1:'KPay 1',kpay2:'KPay 2',wave1:'Wave 1',wave2:'Wave 2',banking:'Banking'};
+
+function getL1Log(){try{return JSON.parse(localStorage.getItem('cb_l1_daylog')||'[]');}catch{return[];}}
+function setL1Log(v){try{localStorage.setItem('cb_l1_daylog',JSON.stringify(v));}catch{}}
+
+function saveL1Snapshot(state){
+  const now=new Date();
+  const dateKey=now.toISOString().slice(0,10);
+  const log=getL1Log();
+  const entry={
+    date:dateKey,
+    label:now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
+    dayName:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()],
+    open:{...state.open},
+    close:{...state.close},
+    savedAt:now.toISOString()
+  };
+  const idx=log.findIndex(e=>e.date===dateKey);
+  if(idx>=0)log[idx]=entry;else log.unshift(entry);
+  log.sort((a,b)=>b.date.localeCompare(a.date));
+  setL1Log(log);
+  fbSet('l1_daylog', log);
+}
+
+function initDayCheck(){
+  const log=getL1Log();
+  const s1=document.getElementById('chk_day1');
+  const s2=document.getElementById('chk_day2');
+  const opts=log.map(e=>`<option value="${e.date}">${e.dayName} · ${e.label}</option>`).join('');
+  if(!opts){document.getElementById('chkResult').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">L1 Entry save ပြီးမှ စစ်နိုင်ပါသည်</div>';return;}
+  s1.innerHTML=opts; s2.innerHTML=opts;
+  if(log.length>=2){s1.selectedIndex=1;s2.selectedIndex=0;}
+  runDayCheck();
+}
+
+function runDayCheck(){
+  const log=getL1Log();
+  const d1=document.getElementById('chk_day1').value;
+  const d2=document.getElementById('chk_day2').value;
+  const e1=log.find(e=>e.date===d1);
+  const e2=log.find(e=>e.date===d2);
+  const el=document.getElementById('chkResult');
+  if(!e1||!e2){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">ရက်နှစ်ရက် ရွေးပါ</div>';return;}
+  if(d1===d2){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">ရက်ကွဲပြားသော နှစ်ရက် ရွေးပါ</div>';return;}
+  let allMatch=true;
+  const rows=CHECK_PMS.map(pid=>{
+    const prev=parseFloat(e1.close&&e1.close[pid])||0;
+    const next=parseFloat(e2.open&&e2.open[pid])||0;
+    const match=prev===next;
+    if(!match&&!(prev===0&&next===0))allMatch=false;
+    return{pid,prev,next,match,diff:next-prev,empty:prev===0&&next===0};
+  });
+  const allReal=rows.filter(r=>!r.empty);
+  const allRealMatch=allReal.length>0&&allReal.every(r=>r.match);
+  const banner=allRealMatch||allReal.length===0?
+    `<div class="check-banner-ok"><div class="check-banner-icon">✅</div><div class="check-banner-txt" style="color:#065f46;">Balance တိုက်ဆိုင်သည် — ကွာဟချက်မရှိ</div></div>`:
+    `<div class="check-banner-fail"><div class="check-banner-icon">⚠️</div><div class="check-banner-txt" style="color:#9f1239;">Balance မတိုက်ဆိုင် — ကွာဟချက်ရှိသည်</div></div>`;
+  const dayRow=`<div class="check-days-row">
+    <div class="check-day-box prev"><div class="check-day-lbl">▼ ရက် ၁ CLOSING</div><div class="check-day-val">${e1.dayName} · ${e1.label}</div></div>
+    <div class="check-day-box next"><div class="check-day-lbl" style="color:var(--c2);">▲ ရက် ၂ OPENING</div><div class="check-day-val" style="color:#9d174d;">${e2.dayName} · ${e2.label}</div></div>
+  </div>`;
+  const grid=`<div class="check-grid">${rows.map(r=>{
+    const cls=r.empty?'ci-empty':r.match?'ci-match':'ci-fail';
+    const badge=r.empty?'na':r.match?'ok':'fail';
+    return `<div class="check-item ${cls}">
+      <div class="ci-pm">${CHECK_LABELS[r.pid]}</div>
+      <div class="ci-prev">▼ ${fmt(r.prev)} ks</div>
+      <div class="ci-next">▲ ${fmt(r.next)} ks</div>
+      <span class="ci-badge ${badge}">${r.empty?'—':r.match?'OK':'DIFF'}</span>
+      ${!r.match&&!r.empty?`<div class="ci-diff" style="color:${r.diff>0?'#ef4444':'#f59e0b'};">${r.diff>0?'+':''}${fmt(r.diff)} ks</div>`:''}
+    </div>`;
+  }).join('')}</div>`;
+  el.innerHTML=banner+dayRow+grid;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+CASHIERS.forEach(buildCashierTab);
+renderSummary();
+</script>
+const PAYMENTS=[
+  {id:'kpay1',label:'KPay 1',limit:2000000},
+  {id:'kpay2',label:'KPay 2',limit:2000000},
+  {id:'wave1',label:'Wave 1',limit:1000000},
+  {id:'wave2',label:'Wave 2',limit:1000000},
+  {id:'banking',label:'Banking',limit:5000000},
+  {id:'one',label:'One',limit:null},
+  {id:'trident',label:'Trident',limit:null},
+];
+const fmt=n=>Math.round(n).toLocaleString();
+const LS={
+  get:k=>{try{return JSON.parse(localStorage.getItem('cb3_'+k)||'null');}catch{return null;}},
+  set:(k,v)=>{try{localStorage.setItem('cb3_'+k,JSON.stringify(v));}catch{}},
+};
+function getCashierState(id){return LS.get(id)||{open:{},close:{},note:'',transfers:[]};}
+function getTxLog(){return LS.get('txlog')||[];}
+function setTxLog(v){LS.set('txlog',v);}
+
+function buildPmGrid(cid,phase,saved){
+  return `<div class="pm-grid">${PAYMENTS.map(p=>{
+    const val=saved&&saved[phase]&&saved[phase][p.id]!=null?saved[phase][p.id]:'';
+    return `<div class="pm-block">
+      <div class="pm-label">${p.label}</div>
+      <input type="number" id="${cid}_${phase}_${p.id}" placeholder="0" value="${val}" oninput="calcBal('${cid}')">
+      <div class="pm-limit">${p.limit?'Max: '+fmt(p.limit)+' ks':'ကန့်သတ်မရှိ'}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function buildOneTxRow(cid,i,tx){
+  const pOpts=PAYMENTS.map(p=>`<option value="${p.id}"${tx.payment===p.id?' selected':''}>${p.label}</option>`).join('');
+  if(tx.type==='cashier'){
+    const cOpts=CASHIERS.filter(c=>c.id!==cid).map(c=>`<option value="${c.id}"${tx.counterpart===c.id?' selected':''}>${c.name}</option>`).join('');
+    const dirOpts=['in','out'].map(d=>`<option value="${d}"${tx.dir===d?' selected':''}>${d==='in'?'ငွေယူ (IN)':'ငွေပေး (OUT)'}</option>`).join('');
+    return `<div class="tx-row" id="${cid}_txrow_${i}">
+      <select onchange="updateTx('${cid}',${i},'dir',this.value)">${dirOpts}</select>
+      <select onchange="updateTx('${cid}',${i},'counterpart',this.value)">${cOpts}</select>
+      <select onchange="updateTx('${cid}',${i},'payment',this.value)">${pOpts}</select>
+      <input type="number" placeholder="ပမာဏ" value="${tx.amount||''}" oninput="updateTx('${cid}',${i},'amount',this.value)" onchange="calcBal('${cid}')">
+      <button class="del-btn" onclick="delTx('${cid}',${i})">×</button>
+    </div>`;
+  } else {
+    const dirOpts=['in','out'].map(d=>`<option value="${d}"${tx.dir===d?' selected':''}>${d==='in'?'ငွေဝင် (IN)':'ငွေထွက် (OUT)'}</option>`).join('');
+    return `<div class="tx-row" id="${cid}_txrow_${i}">
+      <select onchange="updateTx('${cid}',${i},'dir',this.value)">${dirOpts}</select>
+      <input type="text" placeholder="ပြင်ပနာမည်" value="${tx.label||''}" oninput="updateTx('${cid}',${i},'label',this.value)" style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#1a1a18;width:100%;">
+      <select onchange="updateTx('${cid}',${i},'payment',this.value)">${pOpts}</select>
+      <input type="number" placeholder="ပမာဏ" value="${tx.amount||''}" oninput="updateTx('${cid}',${i},'amount',this.value)" onchange="calcBal('${cid}')">
+      <button class="del-btn" onclick="delTx('${cid}',${i})">×</button>
+    </div>`;
+  }
+}
+
+function buildTransferRows(cid,txs){
+  if(!txs||!txs.length) txs=[];
+  const rows=txs.map((tx,i)=>buildOneTxRow(cid,i,tx)).join('');
+  return `<div id="${cid}_txrows">${rows}</div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <button class="add-btn" onclick="addTx('${cid}','cashier')">+ Cashier မှ/ဆီ</button>
+    <button class="add-btn" onclick="addTx('${cid}','external')">+ ပြင်ပ လွှဲငွေ</button>
+  </div>`;
+}
+
+function addTx(cid,type){
+  const state=getCashierState(cid);
+  if(!state.transfers)state.transfers=[];
+  const other=CASHIERS.find(c=>c.id!==cid);
+  state.transfers.push(type==='cashier'?{type:'cashier',dir:'in',counterpart:other?other.id:'',payment:'kpay1',amount:''}:{type:'external',dir:'in',label:'',payment:'kpay1',amount:''});
+  LS.set(cid,state);
+  rerenderTxRows(cid,state.transfers);
+  calcBal(cid);
+}
+
+function delTx(cid,i){
+  const state=getCashierState(cid);
+  state.transfers.splice(i,1);
+  LS.set(cid,state);
+  rerenderTxRows(cid,state.transfers);
+  calcBal(cid);
+}
+
+function updateTx(cid,i,field,val){
+  const state=getCashierState(cid);
+  if(!state.transfers[i])return;
+  state.transfers[i][field]=val;
+  LS.set(cid,state);
+}
+
+function rerenderTxRows(cid,txs){
+  const el=document.getElementById(cid+'_txrows');
+  if(!el)return;
+  el.innerHTML=(txs||[]).map((tx,i)=>buildOneTxRow(cid,i,tx)).join('');
+}
+
+function calcBal(cid){
+  const state=getCashierState(cid);
+  const el=document.getElementById(cid+'_bal');
+  if(!el)return;
+  const txs=state.transfers||[];
+  let rows=`<table class="bal-table">
+  <thead><tr>
+    <th style="width:18%">Payment</th>
+    <th class="amt" style="width:16%">Opening</th>
+    <th class="amt" style="width:16%">+IN / -OUT</th>
+    <th class="amt" style="width:16%">Closing</th>
+    <th class="amt" style="width:18%">ကွာခြားချက်</th>
+    <th class="amt" style="width:16%">Status</th>
+  </tr></thead><tbody>`;
+  let totO=0,totTx=0,totC=0;
+  PAYMENTS.forEach(p=>{
+    const o=parseFloat(document.getElementById(cid+'_open_'+p.id).value)||0;
+    const cl=parseFloat(document.getElementById(cid+'_close_'+p.id).value)||0;
+    const txNet=txs.filter(tx=>tx.payment===p.id&&tx.amount).reduce((s,tx)=>{const amt=parseFloat(tx.amount)||0;return s+(tx.dir==='in'?amt:-amt);},0);
+    const diff=cl-o;
+    totO+=o;totTx+=txNet;totC+=cl;
+    let cls='ok',lbl='OK';
+    if(p.limit){if(cl>p.limit){cls='over';lbl='Limit ကျော်';}else if(cl>p.limit*0.85){cls='warn';lbl='နီးနေပြီ';}}else{lbl='—';}
+    const txCls=txNet>0?'ok':txNet<0?'over':'';
+    rows+=`<tr>
+      <td>${p.label}</td>
+      <td class="amt">${fmt(o)}</td>
+      <td class="amt ${txCls}">${txNet!==0?(txNet>0?'+':'')+fmt(txNet):'—'}</td>
+      <td class="amt">${fmt(cl)}</td>
+      <td class="amt ${diff>=0?'ok':'over'}">${diff>=0?'+':''}${fmt(diff)}</td>
+      <td class="amt ${cls}">${lbl}</td>
+    </tr>`;
+  });
+  const net=totC-totO;
+  rows+=`<tr><td>စုစုပေါင်း</td><td class="amt">${fmt(totO)}</td><td class="amt ${totTx>0?'ok':totTx<0?'over':''}">${totTx!==0?(totTx>0?'+':'')+fmt(totTx):'—'}</td><td class="amt">${fmt(totC)}</td><td class="amt ${net>=0?'ok':'over'}">${net>=0?'+':''}${fmt(net)}</td><td class="amt">—</td></tr></tbody></table>`;
+  el.innerHTML=rows;
+}
+
+function buildCashierTab(c){
+  const saved=getCashierState(c.id);
+  const el=document.getElementById('tab-'+c.id);
+  el.innerHTML=`
+<div class="card">
+  <div class="cashier-header">
+    <div class="avatar" style="background:${c.bg};color:${c.tc};">${c.id}</div>
+    <div><div class="cashier-name">${c.name}</div></div>
+    <div class="shift-badge">${c.shift}</div>
+  </div>
+  <div class="section-hdr">Opening — Shift စချိန် လက်ကျန်ငွေ</div>
+  ${buildPmGrid(c.id,'open',saved)}
+  <div class="section-hdr">ငွေလွှဲ / ငွေယူ မှတ်တမ်း</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;gap:6px;margin-bottom:4px;">
+    <span style="font-size:10px;color:#aaa;">အမျိုးအစား</span>
+    <span style="font-size:10px;color:#aaa;">မှ/ဆီ/နာမည်</span>
+    <span style="font-size:10px;color:#aaa;">Payment</span>
+    <span style="font-size:10px;color:#aaa;">ပမာဏ (ks)</span>
+    <span></span>
+  </div>
+  ${buildTransferRows(c.id,saved.transfers)}
+  <hr class="divider">
+  <div class="section-hdr">Closing — Shift ပြီးချိန် လက်ကျန်ငွေ</div>
+  ${buildPmGrid(c.id,'close',saved)}
+  <div class="section-hdr">Balance ခြုံငုံသုံးသပ်ချက်</div>
+  <div id="${c.id}_bal"></div>
+  <div class="section-hdr">မှတ်ချက်</div>
+  <textarea class="note-area" id="${c.id}_note" rows="2" placeholder="မှတ်ချက်...">${saved.note||''}</textarea>
+  <button class="save-btn" onclick="saveEntry('${c.id}')">Save · ${c.name}</button>
+</div>`;
+  calcBal(c.id);
+}
+
+function saveEntry(cid){
+  const state=getCashierState(cid);
+  PAYMENTS.forEach(p=>{
+    state.open[p.id]=parseFloat(document.getElementById(cid+'_open_'+p.id).value)||0;
+    state.close[p.id]=parseFloat(document.getElementById(cid+'_close_'+p.id).value)||0;
+  });
+  state.note=document.getElementById(cid+'_note').value;
+  LS.set(cid,state);
+  const now=new Date();
+  const ts=now.toLocaleDateString('en-GB')+' '+now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const log=getTxLog();
+  log.unshift({cid,ts,totO:PAYMENTS.reduce((s,p)=>s+(state.open[p.id]||0),0),totC:PAYMENTS.reduce((s,p)=>s+(state.close[p.id]||0),0),note:state.note,txs:state.transfers||[]});
+  if(log.length>60)log.pop();
+  setTxLog(log);
+  saveL1Snapshot(cid);
+  renderTransferTab();
+  renderSummary();
+  alert('Saved!');
+}
+
+function renderTransferTab(){
+  const el=document.getElementById('tab-transfers');
+  const log=getTxLog();
+  if(!log.length){el.innerHTML='<div class="card" style="font-size:13px;color:#888;">မှတ်တမ်းမရှိသေးပါ</div>';return;}
+  const allTx=[];
+  log.forEach(entry=>{(entry.txs||[]).forEach(tx=>{allTx.push({...tx,cid:entry.cid,ts:entry.ts});});});
+  const cashierTx=allTx.filter(t=>t.type==='cashier');
+  const extTx=allTx.filter(t=>t.type==='external');
+  el.innerHTML=`
+<div class="card">
+  <div class="section-hdr" style="margin-top:0;">Cashier အချင်းချင်း ငွေလွှဲမှတ်တမ်း</div>
+  ${cashierTx.length?cashierTx.slice(0,20).map(tx=>{
+    const c=CASHIERS.find(x=>x.id===tx.cid);
+    const other=CASHIERS.find(x=>x.id===tx.counterpart);
+    const pm=PAYMENTS.find(x=>x.id===tx.payment);
+    return `<div class="tx-log-row">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="tx-badge ${tx.dir==='in'?'badge-in':'badge-out'}">${tx.dir==='in'?'IN':'OUT'}</span>
+        <span style="font-weight:500;">${c?c.name:tx.cid}</span>
+        <span style="color:#888;">${tx.dir==='in'?'←':'→'}</span>
+        <span style="font-weight:500;">${other?other.name:tx.counterpart}</span>
+        <span style="color:#aaa;">· ${pm?pm.label:tx.payment}</span>
+        <span style="margin-left:auto;font-weight:700;color:${tx.dir==='in'?'#0ea874':'#ef4444'};">${fmt(parseFloat(tx.amount)||0)} ks</span>
+      </div>
+      <div style="font-size:11px;color:#b0b0c0;margin-top:2px;">${tx.ts}</div>
+    </div>`;
+  }).join(''):'<div style="font-size:12px;color:#b0b0c0;padding:6px 0;">မရှိသေးပါ</div>'}
+</div>
+<div class="card">
+  <div class="section-hdr" style="margin-top:0;">ပြင်ပ ငွေလွှဲမှတ်တမ်း</div>
+  ${extTx.length?extTx.slice(0,20).map(tx=>{
+    const c=CASHIERS.find(x=>x.id===tx.cid);
+    const pm=PAYMENTS.find(x=>x.id===tx.payment);
+    return `<div class="tx-log-row">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="tx-badge ${tx.dir==='in'?'badge-in':'badge-out'}">${tx.dir==='in'?'IN':'OUT'}</span>
+        <span style="font-weight:700;">${c?c.name:tx.cid}</span>
+        <span style="color:#888;">${tx.dir==='in'?'←':'→'}</span>
+        <span>${tx.label||'ပြင်ပ'}</span>
+        <span style="color:#b0b0c0;">· ${pm?pm.label:tx.payment}</span>
+        <span style="margin-left:auto;font-weight:700;color:${tx.dir==='in'?'#0ea874':'#ef4444'};">${fmt(parseFloat(tx.amount)||0)} ks</span>
+      </div>
+      <div style="font-size:11px;color:#b0b0c0;margin-top:2px;">${tx.ts}</div>
+    </div>`;
+  }).join(''):'<div style="font-size:12px;color:#b0b0c0;padding:6px 0;">မရှိသေးပါ</div>'}
+</div>
+<div style="display:flex;justify-content:flex-end;">
+  <button class="clear-btn" onclick="if(confirm('မှတ်တမ်းအားလုံး ဖျက်မလား?')){['L1','L2','L3','L4','txlog'].forEach(k=>localStorage.removeItem('cb3_'+k));location.reload();}">မှတ်တမ်းရှင်းမည်</button>
+</div>`;
+}
+
+function renderSummary(){
+  const el=document.getElementById('tab-summary');
+  let grandO=0,grandC=0;
+  const rows=CASHIERS.map(c=>{
+    const d=getCashierState(c.id);
+    const o=PAYMENTS.reduce((s,p)=>s+(d.open[p.id]||0),0);
+    const cl=PAYMENTS.reduce((s,p)=>s+(d.close[p.id]||0),0);
+    const txNet=(d.transfers||[]).reduce((s,tx)=>{const a=parseFloat(tx.amount)||0;return s+(tx.dir==='in'?a:-a);},0);
+    grandO+=o;grandC+=cl;
+    return {c,o,cl,txNet,diff:cl-o};
+  });
+  const net=grandC-grandO;
+  el.innerHTML=`
+<div class="summary-grid">
+  <div class="metric"><div class="metric-lbl">ဝန်ထမ်း</div><div class="metric-val">4</div></div>
+  <div class="metric"><div class="metric-lbl">Opening (စုစုပေါင်း)</div><div class="metric-val">${fmt(grandO)} ks</div></div>
+  <div class="metric"><div class="metric-lbl">Closing (စုစုပေါင်း)</div><div class="metric-val">${fmt(grandC)} ks</div></div>
+  <div class="metric"><div class="metric-lbl">Net ကွာခြားချက်</div><div class="metric-val" style="color:${net>=0?'#0ea874':'#ef4444'};">${net>=0?'+':''}${fmt(net)} ks</div></div>
+</div>
+<div class="card" style="padding:0;overflow:hidden;">
+<table class="bal-table" style="font-size:13px;">
+<thead><tr>
+  <th style="width:20%">Cashier</th><th style="width:25%">Shift</th>
+  <th class="amt" style="width:16%">Opening</th><th class="amt" style="width:16%">TX Net</th>
+  <th class="amt" style="width:16%">Closing</th><th class="amt" style="width:7%">Net</th>
+</tr></thead>
+<tbody>
+${rows.map(r=>`<tr>
+  <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:20px;height:20px;border-radius:50%;background:${r.c.bg};flex-shrink:0;"></div><span style="font-size:12px;">${r.c.name}</span></div></td>
+  <td style="font-size:11px;color:#888;">${r.c.shift}</td>
+  <td class="amt">${fmt(r.o)}</td>
+  <td class="amt" style="color:${r.txNet>0?'#0ea874':r.txNet<0?'#ef4444':'#aaa'};">${r.txNet!==0?(r.txNet>0?'+':'')+fmt(r.txNet):'—'}</td>
+  <td class="amt">${fmt(r.cl)}</td>
+  <td class="amt" style="color:${r.diff>=0?'#0ea874':'#ef4444'};">${r.diff>=0?'+':''}${fmt(r.diff)}</td>
+</tr>`).join('')}
+<tr style="font-weight:700;background:linear-gradient(135deg,#f5f3ff,#fff0f9);">
+  <td colspan="2">စုစုပေါင်း</td>
+  <td class="amt">${fmt(grandO)}</td><td class="amt">—</td>
+  <td class="amt">${fmt(grandC)}</td>
+  <td class="amt" style="color:${net>=0?'#0ea874':'#ef4444'};">${net>=0?'+':''}${fmt(net)}</td>
+</tr>
+</tbody></table>
+</div>
+<div class="card">
+  <div class="section-hdr" style="margin-top:0;">Payment Acc Limit အခြေအနေ</div>
+  ${CASHIERS.map(c=>{
+    const d=getCashierState(c.id);
+    return PAYMENTS.filter(p=>p.limit).map(p=>{
+      const cl=d&&d.close[p.id]?d.close[p.id]:0;
+      const pct=Math.min(100,Math.round(cl/p.limit*100));
+      const color=pct>90?'#E24B4A':pct>70?'#BA7517':'#639922';
+      return `<div class="bar-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:#888;">${c.name} · ${p.label}</span>
+          <span>${fmt(cl)} / ${fmt(p.limit)} ks</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+      </div>`;
+    }).join('');
+  }).join('')}
+</div>`;
+}
+
+function switchTab(id){
+  const ids=['L1','L2','L3','L4','transfers','daycheck','summary'];
+  document.querySelectorAll('#maintabs .tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if(id==='transfers')renderTransferTab();
+  if(id==='summary')renderSummary();
+  if(id==='daycheck')initDayCheck();
+}
+
+const CHECK_PMS=['kpay1','kpay2','wave1','wave2','banking'];
+const CHECK_LABELS={kpay1:'KPay 1',kpay2:'KPay 2',wave1:'Wave 1',wave2:'Wave 2',banking:'Banking'};
+
+function getL1Log(){try{return JSON.parse(localStorage.getItem('l1_daylog')||'[]');}catch{return[];}}
+function setL1Log(v){try{localStorage.setItem('l1_daylog',JSON.stringify(v));}catch{}}
+
+function saveL1Snapshot(cid){
+  if(cid!=='L1')return;
+  const state=getCashierState('L1');
+  const now=new Date();
+  const dateKey=now.toISOString().slice(0,10);
+  const log=getL1Log();
+  const entry={
+    date:dateKey,
+    label:now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
+    dayName:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()],
+    open:{...state.open},
+    close:{...state.close},
+    savedAt:now.toISOString()
+  };
+  const idx=log.findIndex(e=>e.date===dateKey);
+  if(idx>=0)log[idx]=entry;else log.unshift(entry);
+  log.sort((a,b)=>b.date.localeCompare(a.date));
+  setL1Log(log);
+}
+
+function initDayCheck(){
+  const log=getL1Log();
+  const s1=document.getElementById('chk_day1');
+  const s2=document.getElementById('chk_day2');
+  const opts=log.map(e=>`<option value="${e.date}">${e.dayName} · ${e.label}</option>`).join('');
+  if(!opts){
+    document.getElementById('chkResult').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">L1 Entry save ပြီးမှ စစ်နိုင်ပါသည်</div>';
+    return;
+  }
+  s1.innerHTML=opts;
+  s2.innerHTML=opts;
+  if(log.length>=2){s1.selectedIndex=1;s2.selectedIndex=0;}
+  runDayCheck();
+}
+
+function runDayCheck(){
+  const log=getL1Log();
+  const d1=document.getElementById('chk_day1').value;
+  const d2=document.getElementById('chk_day2').value;
+  const e1=log.find(e=>e.date===d1);
+  const e2=log.find(e=>e.date===d2);
+  const el=document.getElementById('chkResult');
+  if(!e1||!e2){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">ရက်နှစ်ရက် ရွေးပါ</div>';return;}
+  if(d1===d2){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">ရက်ကွဲပြားသော နှစ်ရက် ရွေးပါ</div>';return;}
+
+  let allMatch=true;
+  const rows=CHECK_PMS.map(pid=>{
+    const prev=parseFloat(e1.close&&e1.close[pid])||0;
+    const next=parseFloat(e2.open&&e2.open[pid])||0;
+    const match=prev===next;
+    if(!match&&!(prev===0&&next===0))allMatch=false;
+    return {pid,prev,next,match,diff:next-prev,empty:prev===0&&next===0};
+  });
+
+  const allReal=rows.filter(r=>!r.empty);
+  const allRealMatch=allReal.length>0&&allReal.every(r=>r.match);
+
+  const banner=allRealMatch||allReal.length===0?
+    `<div class="check-banner-ok">
+      <div class="check-banner-icon">✅</div>
+      <div class="check-banner-txt" style="color:#065f46;">Balance တိုက်ဆိုင်သည် — ကွာဟချက်မရှိ</div>
+    </div>`:
+    `<div class="check-banner-fail">
+      <div class="check-banner-icon">⚠️</div>
+      <div class="check-banner-txt" style="color:#9f1239;">Balance မတိုက်ဆိုင် — ကွာဟချက်ရှိသည်</div>
+    </div>`;
+
+  const dayRow=`<div class="check-days-row">
+    <div class="check-day-box prev">
+      <div class="check-day-lbl">▼ ရက် ၁ CLOSING</div>
+      <div class="check-day-val">${e1.dayName} · ${e1.label}</div>
+    </div>
+    <div class="check-day-box next">
+      <div class="check-day-lbl" style="color:var(--c2);">▲ ရက် ၂ OPENING</div>
+      <div class="check-day-val" style="color:#9d174d;">${e2.dayName} · ${e2.label}</div>
+    </div>
+  </div>`;
+
+  const grid=`<div class="check-grid">${rows.map(r=>{
+    const cls=r.empty?'ci-empty':r.match?'ci-match':'ci-fail';
+    const badge=r.empty?'na':r.match?'ok':'fail';
+    const badgeTxt=r.empty?'—':r.match?'OK':'DIFF';
+    return `<div class="check-item ${cls}">
+      <div class="ci-pm">${CHECK_LABELS[r.pid]}</div>
+      <div class="ci-prev">▼ ${fmt(r.prev)} ks</div>
+      <div class="ci-next">▲ ${fmt(r.next)} ks</div>
+      <span class="ci-badge ${badge}">${badgeTxt}</span>
+      ${!r.match&&!r.empty?`<div class="ci-diff" style="color:${r.diff>0?'#ef4444':'#f59e0b'};">${r.diff>0?'+':''}${fmt(r.diff)} ks</div>`:''}
+    </div>`;
+  }).join('')}</div>`;
+
+  el.innerHTML=banner+dayRow+grid;
+}
+
+CASHIERS.forEach(buildCashierTab);
+renderSummary();
+</script>
+</body>
+</html>
